@@ -13,8 +13,6 @@
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
 #define ETHER_ADDR_LEN 6 
 
-
-
 void usage() {
 	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
