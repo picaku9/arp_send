@@ -43,13 +43,25 @@ void get_dev_ip_addr(char *ip, char *dev){
 	struct ifreq ifr;
 	if(s < 0) perror("socket fail");
 	strncpy(ifr.ifr_name, dev, IFNAMSIZ-1);
-	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) perror("ioctl fail");
+	if(ioctl(s, SIOCGIFADDR, &ifr) < 0) perror("ioctl fail");
 	struct sockaddr_in *sin;
 	sin = (struct sockaddr_in*)&ifr.ifr_addr;
-	memcpy(ip, inet_ntoa(sin->sin_addr), 13);
+	memcpy(ip, inet_ntoa(sin->sin_addr), 15);
 	printf("MY IP address : %s\n", ip);
 	close(s);
 }
+
+
+void rq_arp(pcap_t* handle, struct rq_packet* p) {
+	p->eth_header.ether_type = htons(0x0806);
+	p->arp.ar_hrd = htons(1);
+	p->arp.ar_pro = htons(0x0800);
+	p->arp.ar_hln = (uint8_t)6;
+	p->arp.ar_pln = (uint8_t)4;
+	p->arp.ar_op = (uint16_t)1; //request
+	pcap_sendpacket(handle, p, sizeof(struct rq_packet));
+}
+
 
 /*이제 사용 안함.
 struct ip_addr {
