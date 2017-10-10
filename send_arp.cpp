@@ -4,6 +4,7 @@
 #include <pcap.h>
 #include <arpa/inet.h>
 #include <netinet/in.h> //inet_pton()
+#include <net/if.h> //ifreq header
 
 #define LIBNET_ARP_H            0x08    /**< ARP header w/o addrs: 8 bytes */
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
