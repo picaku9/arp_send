@@ -6,7 +6,7 @@ send_arp : send_arp.o main.o
 send_arp.o: send_arp.cpp send_arp.h
 	g++ -c -o send_arp.o send_arp.cpp -lpcap
 
-main.o: main.c send_arp.h
+main.o: main.cpp send_arp.h
 	g++ -c -o main.o main.cpp
 
 clean:
