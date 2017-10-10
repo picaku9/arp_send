@@ -1,14 +1,5 @@
 #include "send_arp.h"
 
-void rq_arp(struct rq_packet* p) {
-	p->eth_header.ether_type = htons(0x0806);
-	p->arp_p.arp_hw = htons(1);
-	p->arp_p.arp_pro = htons(0x0800);
-	p->arp_p.arp_hlen = (uint8_t)6;
-	p->arp_p.arp_plen = (uint8_t)4;
-	p->arp_p.arp_op = (uint16_t)1; //request
-}
-
 int main(int argc, char *argv[]) {
 	//uint8_t* my_ether, sender_ether;
 	uint8_t my_ether[6], sender_ether[6];
@@ -84,7 +75,8 @@ int main(int argc, char *argv[]) {
 	int tmp;
 	struct libnet_ethernet_hdr *tmp_eth;
 	const uint8_t *get_packet;
-	struct pcap_pkthdr header;
+	struct pcap_pkthdr *header;
+	struct ARP_Header *tmp_arp;
 
 	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
 
