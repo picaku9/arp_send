@@ -110,8 +110,6 @@ int main(int argc, char *argv[]) {
 		usage(); 
 		return -1;
 	}
-	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
-
 	printf("MY Interface : %s\n", argv[1]);
 	// NOTICE.  sender recieves arp reply. 
 	printf("Sender(victim) IP : %s\n", argv[2]);
@@ -129,7 +127,7 @@ int main(int argc, char *argv[]) {
 	1. send ARP reques
 	2. receive ARP reply
 	3. send ARP reply
-        */
+	*/
 
 	//1 send ARP request
 	memcpy(rq_p.arp_p.dest_ip_addr, send_ip, 4);
@@ -139,11 +137,13 @@ int main(int argc, char *argv[]) {
 	memcpy(rq_p.arp_p.source_ether_addr, my_ether, 6);
 	memcpy(rq_p.arp_p.dest_ether_addr, broadcast_ether, 6);
 	rq_arp(&rq_p); // make the rest of request packet
+
 	//print request packet
 	printf("---------------ethernet protocol--------------------\n");
 	print_ether(rq_p.eth_header.ether_dhost);
 	print_ether(rq_p.eth_header.ether_shost);
 	printf("ether type : 0x%04x\n", htons(rq_p.eth_header.ether_type));
+
 	printf("---------------arp protocol--------------------\n");
 	printf("Hardware type : 0x%04x\n", htons(rq_p.arp_p.arp_hw));
 	printf("Protocol type : 0x0%x\n", htons(rq_p.arp_p.arp_pro));
@@ -158,7 +158,10 @@ int main(int argc, char *argv[]) {
 	print_ip(rq_p.arp_p.source_ip_addr);
 	printf("Destination ip ");
 	print_ip(rq_p.arp_p.dest_ip_addr);
+
 	// send packet
+	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
+
 	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
 	/*
         while(1) {
@@ -174,7 +177,8 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        */
+    */
+    
 	printf("Sender ethernet address :");
 	print_ether(sender_ether);
 	return 0;
