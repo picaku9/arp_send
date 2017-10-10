@@ -13,8 +13,6 @@
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
 #define ETHER_ADDR_LEN 6 
 
-
-
 void usage() {
 	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
@@ -161,6 +159,7 @@ int main(int argc, char *argv[]) {
 
 	// send packet
 	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
+	if(handle == NULL)  perror("handle null");
 
 	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
 	/*
