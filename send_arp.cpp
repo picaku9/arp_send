@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <pcap.h>
 #include <arpa/inet.h>
@@ -6,10 +7,10 @@
 
 #define LIBNET_ARP_H            0x08    /**< ARP header w/o addrs: 8 bytes */
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
-
+#define ETHER_ADDR_LEN 6 
 
 void usage() {
-	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n")
+	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
 
 void get_dev_ether_adder(uint8_t *ether, char *dev) {
