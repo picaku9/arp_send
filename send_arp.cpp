@@ -78,14 +78,21 @@ struct ARP_Header{
 	uint8_t dest_ip_addr[4];
 };
 
+struct rq_packet{
+	struct libnet_ethernet_hdr eth_header;
+	struct ARP_Header arp_packet;
+};
+
 int main(int argc, char *argv[]) {
 	//uint8_t* my_ether, sender_ether;
 	uint8_t my_ether[6], sender_ether[6];
 	//uint8_t *target_ether  : no need.
-	struct ARP_Header arp_hd, fake_arp_hd;
+	//struct ARP_Header arp_hd, fake_arp_hd;
+	struct rq_packet rq_p;
 	char* dev;
-	char* my_ip;
+	char* my_ip, send_ip, target_ip;
 	char errbuf[PCAP_ERRBUF_SIZE];
+	uint8_t broadcast_ether[6]= "\xff\xff\xff\xff\xff\xff";
 
 	//step zero.
 	if(argc<4) {
@@ -93,6 +100,7 @@ int main(int argc, char *argv[]) {
 		usage(); 
 		return -1;
 	}
+	handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
 
 	printf("MY Interface : %s\n", argv[1]);
 	// NOTICE.  sender recieves arp reply. 
@@ -100,8 +108,11 @@ int main(int argc, char *argv[]) {
 	printf("FAKE Target IP : %s\n", argv[3]);
 	dev = argv[1];
 
-	inet_pton(AF_INET, argv[2], &fake_arp_hd.dest_ip_addr);
-	inet_pton(AF_INET, argv[3], &fake_arp_hd.source_ip_addr);
+	send_ip = argv[2];
+	target_ip = argv[3];
+	
+//	inet_pton(AF_INET, argv[2], &fake_arp_hd.dest_ip_addr);
+//	inet_pton(AF_INET, argv[3], &fake_arp_hd.source_ip_addr);
 
 	get_dev_ether_addr(my_ether, dev);
 	print_ether(my_ether);
@@ -115,7 +126,12 @@ int main(int argc, char *argv[]) {
 	*/
 	
 	//1 send ARP request
-	//	get_ip_to_ether_addr(sender_ether, argv[2]);
+	inet_pton(AF_INET, my_ip, &rq_p.arp_packet.source_ip_addr);
+	inet_pton(AF_INET, send_ip, &rq_p.arp_packet.dest_ip_addr);
+
+	rq_p.eth_header.ether_shost = my_ether;
+	rq_p.eth_header.ether_dhost = broadcast_ether;
+	sender_ether = rq_arp(handle, rq_p); // ask sender ethernet address
 
 	return 0;
 
