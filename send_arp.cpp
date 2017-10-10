@@ -13,45 +13,41 @@
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
 #define ETHER_ADDR_LEN 6 
 
+
+
 void usage() {
 	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
 
-void get_dev_ether_addr(uint8_t *ether, char *dev) {
-	struct ifreq ifr;
-	int s;
-	if(s = socket(AF_INET, SOCK_DGRAM,0) < 0) {
-		perror("socket error_dev_ether");
-		exit(1);
-	}
-	memset(&ifr, 0, sizeof(ifr));
-	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", dev);
 
-	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) {
-		perror("ioctl error_dev_ether");
-		exit(1);
+void print_ether(uint8_t *ether){
+	printf("MAC address : ");
+	for (int i = 0; i < 5; i++) {
+		printf("%02x:", ether[i]);
 	}
-	memcpy(ether, ifr.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
+	printf("%02x\n", ether[5]);
+}
+
+void get_dev_ether_addr(uint8_t *ether, char *dev) {
+	int s = socket(AF_INET, SOCK_DGRAM, 0);
+	struct ifreq ifr;
+	if(s < 0) perror("socket fail");
+	strncpy(ifr.ifr_name, dev, IFNAMSIZ-1);
+	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) perror("ioctl fail");
+	memcpy(ether, ifr.ifr_hwaddr.sa_data, 6);
 	close(s);
 }
 
 void get_dev_ip_addr(char *ip, char *dev){
-	int s;
+	int s = socket(AF_INET, SOCK_DGRAM, 0);
 	struct ifreq ifr;
-
-	if(s = socket(AF_INET, SOCK_DGRAM,0) < 0) {
-		perror("socket error_dev_ip");
-		exit(1);
-	}
-	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_addr.sa_family = AF_INET;
-	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", dev);
-
-	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) {
-		perror("ioctl error_dev_ip");
-		exit(1);
-	}
-	ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
+	if(s < 0) perror("socket fail");
+	strncpy(ifr.ifr_name, dev, IFNAMSIZ-1);
+	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) perror("ioctl fail");
+	struct sockaddr_in *sin;
+	sin = (struct sockaddr_in*)&ifr.ifr_addr;
+	memcpy(ip, inet_ntoa(sin->sin_addr), 13);
+	printf("MY IP address : %s\n", ip);
 	close(s);
 }
 
@@ -62,6 +58,7 @@ struct ip_addr {
 */
 
 //libnet_header 참고 이더넷 구조체
+
 struct libnet_ethernet_hdr
 {
 	u_int8_t  ether_dhost[ETHER_ADDR_LEN];/* destination ethernet address */
@@ -82,43 +79,44 @@ struct ARP_Header{
 };
 
 int main(int argc, char *argv[]) {
-
-	uint8_t* my_ether, sender_ether;
+	//uint8_t* my_ether, sender_ether;
+	uint8_t my_ether[6], sender_ether[6];
 	//uint8_t *target_ether  : no need.
 	struct ARP_Header arp_hd, fake_arp_hd;
 	char* dev;
 	char* my_ip;
 	char errbuf[PCAP_ERRBUF_SIZE];
 
-
 	//step zero.
 	if(argc<4) {
-	
-	//Should have syntax: send_arp <interface> <send ip> <target ip>
+		//Should have syntax: send_arp <interface> <send ip> <target ip>
 		usage(); 
 		return -1;
 	}
+
 	printf("MY Interface : %s\n", argv[1]);
 	// NOTICE.  sender recieves arp reply. 
 	printf("Sender(victim) IP : %s\n", argv[2]);
 	printf("FAKE Target IP : %s\n", argv[3]);
 	dev = argv[1];
+
 	inet_pton(AF_INET, argv[2], &fake_arp_hd.dest_ip_addr);
 	inet_pton(AF_INET, argv[3], &fake_arp_hd.source_ip_addr);
-	get_dev_ether_addr(my_ether, argv[1]);
-	get_dev_ip_addr(my_ip, argv[1]);
-	printf("my_mac : %s\n", my_ether);
+
+	get_dev_ether_addr(my_ether, dev);
+	print_ether(my_ether);
+	get_dev_ip_addr(my_ip, dev);
 	printf("my_ip : %s\n", my_ip);
 
 	/* 3 steps.
-	1. send ARP request
+	1. send ARP reques
 	2. receive ARP reply
 	3. send ARP reply
 	*/
-
+	
 	//1 send ARP request
-//	get_ip_to_ether_addr(sender_ether, argv[2]);
-
+	//	get_ip_to_ether_addr(sender_ether, argv[2]);
 
 	return 0;
+
 }
