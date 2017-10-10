@@ -87,7 +87,6 @@ void rq_arp(struct rq_packet* p) {
 	p->arp_p.arp_op = (uint16_t)1; //request
 }
 
-
 int main(int argc, char *argv[]) {
 	//uint8_t* my_ether, sender_ether;
 	uint8_t my_ether[6], sender_ether[6];
@@ -160,25 +159,42 @@ int main(int argc, char *argv[]) {
 	// send packet
 	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
 	if(handle == NULL)  perror("handle null");
+	int tmp;
+	struct libnet_ethernet_hdr *tmp_eth;
+	const uint8_t *get_packet;
+	struct pcap_pkthdr header;
 
 	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
-	/*
-        while(1) {
-            tmp = pcap_next_ex(handle, &header, &get_packet);
-            if(tmp<1) continue;
-            tmp_eth = (struct libnet_ethernet_hdr *)get_packet;
-            if(ntohs(tmp_eth->ether_type) != 0X0806) continue;
-            tmp_arp = (struct ARP_Header *)(get_packet+sizeof(libnet_ethernet_hdr));
-            if(ntohs(tmp_arp->arp_hw) == 0x0001 && ntohs(tmp_arp->arp_op) == 0x2) {
-                if(tmp_arp->source_ip_addr == rq_p.arp_p.dest_ip_addr) {
-                    memcpy(sender_ether, tmp_arp->dest_ether_addr, 6);
-                    break;
-                }
-            }
-        }
-    */
-    
+
+	while(1) {
+		tmp = pcap_next_ex(handle, &header, &get_packet);
+		if(tmp<1) continue;
+		tmp_eth = (struct libnet_ethernet_hdr *)get_packet;
+		if(ntohs(tmp_eth->ether_type) != 0X0806) continue;
+		tmp_arp = (struct ARP_Header *)(get_packet + sizeof(libnet_ethernet_hdr));
+		if(ntohs(tmp_arp->arp_hw) == 0x0001 && ntohs(tmp_arp->arp_op) == 0x2) {
+			if(tmp_arp->source_ip_addr == rq_p.arp_p.dest_ip_addr) {
+				memcpy(sender_ether, tmp_arp->source_ether_addr, 6);
+				break;
+			}
+		}
+	}
 	printf("Sender ethernet address :");
 	print_ether(sender_ether);
+
+	//3. send ARP reply
+	struct rq_packet rp_p; //reply packet
+	memcpy(rp_p.eth_header.ether_shost, my_ether, 6);
+	memcpy(rp_p.eth_header.ether_dhost, sender_ether, 6);
+
+	memcpy(rp_p.arp_p.dest_ip_addr, send_ip, 4);
+	memcpy(rp_p.arp_p.source_ip_addr, target_ip, 4);
+
+	memcpy(rp_p.arp_p.source_ether_addr, my_ether, 6);
+	memcpy(rp_p.arp_p.dest_ether_addr, sender_ether, 6);
+	rp_p.arp_p.arp_op = htons(2); //reply
+
+	pcap_sendpacket(handle, (uint8_t *)&rp_p, sizeof(rp_p));
+
 	return 0;
 }
