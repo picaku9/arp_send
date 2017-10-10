@@ -161,6 +161,7 @@ int main(int argc, char *argv[]) {
 
 	// send packet
 	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
+	if(handle == NULL)  perror("handle null");
 
 	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
 	/*
