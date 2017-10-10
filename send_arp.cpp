@@ -7,6 +7,7 @@
 #include <net/if.h> //ifreq header
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 #define LIBNET_ARP_H            0x08    /**< ARP header w/o addrs: 8 bytes */
 #define LIBNET_ARP_ETH_IP_H     0x1c    /**< ARP w/ ETH and IP:   28 bytes */
@@ -16,18 +17,18 @@ void usage() {
 	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
 
-void get_dev_ether_adder(uint8_t *ether, char *dev) {
+void get_dev_ether_addr(uint8_t *ether, char *dev) {
 	struct ifreq ifr;
 	int s;
 	if(s = socket(AF_INET, SOCK_DGRAM,0) < 0) {
-		perror("socket error");
+		perror("socket error_dev_ether");
 		exit(1);
 	}
 	memset(&ifr, 0, sizeof(ifr));
 	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", dev);
 
 	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) {
-		perror("ioctl error");
+		perror("ioctl error_dev_ether");
 		exit(1);
 	}
 	memcpy(ether, ifr.ifr_hwaddr.sa_data, 6 * sizeof(uint8_t));
@@ -39,7 +40,7 @@ void get_dev_ip_addr(char *ip, char *dev){
 	struct ifreq ifr;
 
 	if(s = socket(AF_INET, SOCK_DGRAM,0) < 0) {
-		perror("socket error");
+		perror("socket error_dev_ip");
 		exit(1);
 	}
 	memset(&ifr, 0, sizeof(ifr));
@@ -47,7 +48,7 @@ void get_dev_ip_addr(char *ip, char *dev){
 	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", dev);
 
 	if(ioctl(s, SIOCGIFHWADDR, &ifr) < 0) {
-		perror("ioctl error");
+		perror("ioctl error_dev_ip");
 		exit(1);
 	}
 	ip = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
@@ -78,11 +79,11 @@ struct ARP_Header{
 	uint8_t source_ip_addr[4];
 	uint8_t dest_ether_addr[6];
 	uint8_t dest_ip_addr[4];
-}
+};
 
 int main(int argc, char *argv[]) {
 
-	uint8_t my_ether, sender_ether;
+	uint8_t* my_ether, sender_ether;
 	//uint8_t *target_ether  : no need.
 	struct ARP_Header arp_hd, fake_arp_hd;
 	char* dev;
@@ -106,7 +107,7 @@ int main(int argc, char *argv[]) {
 	inet_pton(AF_INET, argv[3], &fake_arp_hd.source_ip_addr);
 	get_dev_ether_addr(my_ether, argv[1]);
 	get_dev_ip_addr(my_ip, argv[1]);
-	printf("my_mac : %s\n", my_ip);
+	printf("my_mac : %s\n", my_ether);
 	printf("my_ip : %s\n", my_ip);
 
 	/* 3 steps.
