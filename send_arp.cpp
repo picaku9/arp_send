@@ -19,13 +19,19 @@ void usage() {
 	printf("Should have syntax: send_arp <interface> <send ip> <target ip>\n");
 }
 
-
 void print_ether(uint8_t *ether){
 	printf("MAC address : ");
 	for (int i = 0; i < 5; i++) {
 		printf("%02x:", ether[i]);
 	}
 	printf("%02x\n", ether[5]);
+}
+void print_ip(uint8_t *ip) {
+	printf("IP address : ");
+	for (int i = 0; i < 3; i++) {
+		printf("%d.", ip[i]);
+	}
+	printf("%d\n", ip[3]);
 }
 
 void get_dev_ether_addr(uint8_t *ether, char *dev) {
@@ -38,36 +44,15 @@ void get_dev_ether_addr(uint8_t *ether, char *dev) {
 	close(s);
 }
 
-void get_dev_ip_addr(char *ip, char *dev){
+void get_dev_ip_addr(uint8_t *ip, char *dev){
 	int s = socket(AF_INET, SOCK_DGRAM, 0);
 	struct ifreq ifr;
 	if(s < 0) perror("socket fail");
 	strncpy(ifr.ifr_name, dev, IFNAMSIZ-1);
 	if(ioctl(s, SIOCGIFADDR, &ifr) < 0) perror("ioctl fail");
-	struct sockaddr_in *sin;
-	sin = (struct sockaddr_in*)&ifr.ifr_addr;
-	memcpy(ip, inet_ntoa(sin->sin_addr), 15);
-	printf("MY IP address : %s\n", ip);
+	memcpy(ip, &(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), 4 * sizeof(*ip));
 	close(s);
 }
-
-
-void rq_arp(pcap_t* handle, struct rq_packet* p) {
-	p->eth_header.ether_type = htons(0x0806);
-	p->arp.ar_hrd = htons(1);
-	p->arp.ar_pro = htons(0x0800);
-	p->arp.ar_hln = (uint8_t)6;
-	p->arp.ar_pln = (uint8_t)4;
-	p->arp.ar_op = (uint16_t)1; //request
-	pcap_sendpacket(handle, p, sizeof(struct rq_packet));
-}
-
-
-/*이제 사용 안함.
-struct ip_addr {
-	u_int8_t s_ip[4];
-};
-*/
 
 //libnet_header 참고 이더넷 구조체
 
@@ -90,10 +75,20 @@ struct ARP_Header{
 	uint8_t dest_ip_addr[4];
 };
 
-struct rq_packet{
+struct rq_packet {
 	struct libnet_ethernet_hdr eth_header;
-	struct ARP_Header arp_packet;
+	struct ARP_Header arp_p;
 };
+
+void rq_arp(struct rq_packet* p) {
+	p->eth_header.ether_type = htons(0x0806);
+	p->arp_p.arp_hw = htons(1);
+	p->arp_p.arp_pro = htons(0x0800);
+	p->arp_p.arp_hlen = (uint8_t)6;
+	p->arp_p.arp_plen = (uint8_t)4;
+	p->arp_p.arp_op = (uint16_t)1; //request
+}
+
 
 int main(int argc, char *argv[]) {
 	//uint8_t* my_ether, sender_ether;
@@ -101,10 +96,13 @@ int main(int argc, char *argv[]) {
 	//uint8_t *target_ether  : no need.
 	//struct ARP_Header arp_hd, fake_arp_hd;
 	struct rq_packet rq_p;
-	char* dev;
-	char* my_ip, send_ip, target_ip;
+	char *dev;
+	uint8_t my_ip[4];
+	uint8_t send_ip[4];
+	uint8_t target_ip[4];
+
 	char errbuf[PCAP_ERRBUF_SIZE];
-	uint8_t broadcast_ether[6]= "\xff\xff\xff\xff\xff\xff";
+	uint8_t broadcast_ether[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 	//step zero.
 	if(argc<4) {
@@ -112,39 +110,72 @@ int main(int argc, char *argv[]) {
 		usage(); 
 		return -1;
 	}
-	handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
+	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
 
 	printf("MY Interface : %s\n", argv[1]);
 	// NOTICE.  sender recieves arp reply. 
 	printf("Sender(victim) IP : %s\n", argv[2]);
 	printf("FAKE Target IP : %s\n", argv[3]);
 	dev = argv[1];
-
-	send_ip = argv[2];
-	target_ip = argv[3];
-	
-//	inet_pton(AF_INET, argv[2], &fake_arp_hd.dest_ip_addr);
-//	inet_pton(AF_INET, argv[3], &fake_arp_hd.source_ip_addr);
-
+	inet_aton(argv[2], (in_addr *)send_ip);
+	inet_aton(argv[3], (in_addr *)target_ip);
 	get_dev_ether_addr(my_ether, dev);
 	print_ether(my_ether);
 	get_dev_ip_addr(my_ip, dev);
-	printf("my_ip : %s\n", my_ip);
+	printf("my ip ");
+	print_ip(my_ip);
 
 	/* 3 steps.
 	1. send ARP reques
 	2. receive ARP reply
 	3. send ARP reply
-	*/
-	
+        */
+
 	//1 send ARP request
-	inet_pton(AF_INET, my_ip, &rq_p.arp_packet.source_ip_addr);
-	inet_pton(AF_INET, send_ip, &rq_p.arp_packet.dest_ip_addr);
-
-	rq_p.eth_header.ether_shost = my_ether;
-	rq_p.eth_header.ether_dhost = broadcast_ether;
-	sender_ether = rq_arp(handle, rq_p); // ask sender ethernet address
-
+	memcpy(rq_p.arp_p.dest_ip_addr, send_ip, 4);
+	memcpy(rq_p.arp_p.source_ip_addr, my_ip, 4);
+	memcpy(rq_p.eth_header.ether_shost, my_ether, 6);
+	memcpy(rq_p.eth_header.ether_dhost, broadcast_ether, 6);
+	memcpy(rq_p.arp_p.source_ether_addr, my_ether, 6);
+	memcpy(rq_p.arp_p.dest_ether_addr, broadcast_ether, 6);
+	rq_arp(&rq_p); // make the rest of request packet
+	//print request packet
+	printf("---------------ethernet protocol--------------------\n");
+	print_ether(rq_p.eth_header.ether_dhost);
+	print_ether(rq_p.eth_header.ether_shost);
+	printf("ether type : 0x%04x\n", htons(rq_p.eth_header.ether_type));
+	printf("---------------arp protocol--------------------\n");
+	printf("Hardware type : 0x%04x\n", htons(rq_p.arp_p.arp_hw));
+	printf("Protocol type : 0x0%x\n", htons(rq_p.arp_p.arp_pro));
+	printf("Hardware size : %d\n", rq_p.arp_p.arp_hlen);
+	printf("Protocol size : %d\n", rq_p.arp_p.arp_plen);
+	printf("Opcode : %d\n", rq_p.arp_p.arp_op);
+	printf("Source ");
+	print_ether(rq_p.arp_p.source_ether_addr);
+	printf("Destination ");
+	print_ether(rq_p.arp_p.dest_ether_addr);
+	printf("Source ip ");
+	print_ip(rq_p.arp_p.source_ip_addr);
+	printf("Destination ip ");
+	print_ip(rq_p.arp_p.dest_ip_addr);
+	// send packet
+	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
+	/*
+        while(1) {
+            tmp = pcap_next_ex(handle, &header, &get_packet);
+            if(tmp<1) continue;
+            tmp_eth = (struct libnet_ethernet_hdr *)get_packet;
+            if(ntohs(tmp_eth->ether_type) != 0X0806) continue;
+            tmp_arp = (struct ARP_Header *)(get_packet+sizeof(libnet_ethernet_hdr));
+            if(ntohs(tmp_arp->arp_hw) == 0x0001 && ntohs(tmp_arp->arp_op) == 0x2) {
+                if(tmp_arp->source_ip_addr == rq_p.arp_p.dest_ip_addr) {
+                    memcpy(sender_ether, tmp_arp->dest_ether_addr, 6);
+                    break;
+                }
+            }
+        }
+        */
+	printf("Sender ethernet address :");
+	print_ether(sender_ether);
 	return 0;
-
 }
