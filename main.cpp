@@ -71,28 +71,40 @@ int main(int argc, char *argv[]) {
 
 	// send packet
 	pcap_t* handle = pcap_open_live(argv[1],BUFSIZ,1,1000,errbuf);
-	if(handle == NULL)  perror("handle null");
+	if (handle == NULL) {
+		fprintf(stderr, "couldn't open device %s: %s\n", dev, errbuf);
+		return -1;
+	}
+
 	int tmp;
 	struct libnet_ethernet_hdr *tmp_eth;
 	const uint8_t *get_packet;
 	struct pcap_pkthdr *header;
 	struct ARP_Header *tmp_arp;
 
-	pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
+	int timeout = 10;
+	while(timeout != 0) {
+		pcap_sendpacket(handle, (uint8_t*)&rq_p, sizeof(struct rq_packet));
 
-	while(1) {
-		tmp = pcap_next_ex(handle, &header, &get_packet);
-		if(tmp<1) continue;
-		tmp_eth = (struct libnet_ethernet_hdr *)get_packet;
-		if(ntohs(tmp_eth->ether_type) != 0X0806) continue;
-		tmp_arp = (struct ARP_Header *)(get_packet + sizeof(libnet_ethernet_hdr));
-		if(ntohs(tmp_arp->arp_hw) == 0x0001 && ntohs(tmp_arp->arp_op) == 0x2) {
-			if(tmp_arp->source_ip_addr == rq_p.arp_p.dest_ip_addr) {
-				memcpy(sender_ether, tmp_arp->source_ether_addr, 6);
-				break;
+		while(1) {
+			tmp = pcap_next_ex(handle, &header, &get_packet);
+			if(tmp<1) continue;
+			tmp_eth = (struct libnet_ethernet_hdr *)get_packet;
+			if(ntohs(tmp_eth->ether_type) != 0X0806) continue;
+			tmp_arp = (struct ARP_Header *)(get_packet + sizeof(libnet_ethernet_hdr));
+			if(ntohs(tmp_arp->arp_hw) == 0x0001 && ntohs(tmp_arp->arp_op) == 0x2 ) {
+				if(tmp_arp->source_ip_addr == rq_p.arp_p.dest_ip_addr) {
+					memcpy(sender_ether, tmp_arp->source_ether_addr, 6);
+					break;
+				}
+				else if(timeout == 0) {
+					perror("Timeout ARP request Fail\n");
+				}
+				else timeout--;
 			}
 		}
 	}
+	
 	printf("Sender ethernet address :");
 	print_ether(sender_ether);
 
